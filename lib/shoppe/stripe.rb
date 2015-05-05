@@ -26,7 +26,9 @@ module Shoppe
         
         # When an order is confirmed, attempt to authorise the payment
         Shoppe::Order.before_confirmation do
+          logger.debug "Trigger before_confirmation"
           if self.properties['stripe_customer_token']
+            logger.debug "Trigger stripe_customer_token"
             begin
               charge = ::Stripe::Charge.create({:customer => self.properties['stripe_customer_token'], :amount => (self.total * BigDecimal(100)).round, :currency => Shoppe.settings.stripe_currency, :capture => false}, Shoppe.settings.stripe_api_key)
               self.payments.create(:amount => self.total, :method => 'Stripe', :reference => charge.id, :refundable => true, :confirmed => false)
@@ -38,6 +40,7 @@ module Shoppe
         
         # When an order is accepted, attempt to capture the payment
         Shoppe::Order.before_acceptance do
+          logger.debug "Trigger before_acceptance"
           self.payments.where(:confirmed => false, :method => 'Stripe').each do |payment|
             begin
               payment.stripe_charge.capture
@@ -51,6 +54,7 @@ module Shoppe
         # When an order is rejected, attempt to refund all the payments which have been 
         # created with Stripe and are not confirmed.
         Shoppe::Order.before_rejection do
+          logger.debug "Trigger before_rejection"
           self.payments.where(:confirmed => false, :method => 'Stripe').each do |payment|
             payment.refund!(payment.refundable_amount)
           end
@@ -59,6 +63,7 @@ module Shoppe
         # When a new payment is added which is a refund and associated with another Stripe method, 
         # attempt to refund it automatically.
         Shoppe::Payment.before_create do
+          logger.debug "Trigger before_create"
           if self.refund? && self.parent && self.parent.method == 'Stripe'
             begin
               options = {}
